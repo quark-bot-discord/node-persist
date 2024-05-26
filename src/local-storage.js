@@ -324,7 +324,7 @@ LocalStorage.prototype = {
 
 	readFile: function (file, options = {}) {
 		return new Promise((resolve, reject) => {
-			fs.readFile(file, this.options.encoding, (err, text) => {
+			fs.readFile(file, this.options.encoding, async (err, text) => {
 				if (err) {
 					/* Only throw the error if the error is something else other than the file doesn't exist */
 					if (err.code === 'ENOENT') {
@@ -336,6 +336,7 @@ LocalStorage.prototype = {
 				}
 				let input = options.raw ? text : this.parse(text);
 				if (!options.raw && !isValidStorageFileContent(input)) {
+					await this.deleteFile(file);
 					return this.options.forgiveParseErrors ? resolve(options.raw ? '{}' : {}) : reject(new Error(`[node-persist][readFile] ${file} does not look like a valid storage file!`));
 				}
 				resolve(input);
