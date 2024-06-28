@@ -7,7 +7,7 @@
  * MYSQL TABLE:
  * CREATE TABLE data_bucket_index (
  *  datakey VARCHAR(128) PRIMARY KEY,
- * 	ttl BIGINT
+ * 	ttl BIGINT UNSIGNED
  * );
  */
 
