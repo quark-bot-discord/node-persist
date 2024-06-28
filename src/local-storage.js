@@ -6,7 +6,7 @@
 /**
  * MYSQL TABLE:
  * CREATE TABLE data_bucket_index (
- *  key VARCHAR(128) PRIMARY KEY,
+ *  datakey VARCHAR(128) PRIMARY KEY,
  * 	ttl BIGINT
  * );
  */
@@ -207,7 +207,7 @@ LocalStorage.prototype = {
 		this.log(`set ('${key}': '${this.stringify(value)}')`);
 		let datum = { key, value, ttl };
 		this.queueWriteFile(this.getDatumPath(key), datum);
-		this.dataBucketIndex.query("INSERT INTO data_bucket_index (key, ttl) VALUES (:key, :ttl) ON DUPLICATE KEY UPDATE ttl = VALUES(ttl)", { key: key, ttl: ttl });
+		this.dataBucketIndex.query("INSERT INTO data_bucket_index (datakey, ttl) VALUES (:datakey, :ttl) ON DUPLICATE KEY UPDATE ttl = VALUES(ttl)", { datakey: key, ttl: ttl });
 	},
 
 	update: function (key, value, options = {}) {
@@ -273,15 +273,15 @@ LocalStorage.prototype = {
 
 	removeItem: function (key) {
 		this.deleteFile(this.getDatumPath(key));
-		this.dataBucketIndex.query("DELETE FROM data_bucket_index WHERE key = :key", { key: key });
+		this.dataBucketIndex.query("DELETE FROM data_bucket_index WHERE datakey = :datakey", { datakey: key });
 	},
 
 	removeExpiredItems: async function () {
 
-		this.dataBucketIndex.query("SELECT key FROM data_bucket_index WHERE ttl < :ttl", { ttl: (new Date()).getTime() }).then(async (rows) => {
+		this.dataBucketIndex.query("SELECT datakey FROM data_bucket_index WHERE ttl < :ttl", { ttl: (new Date()).getTime() }).then(async (rows) => {
 
 			for (let row of rows[0]) {
-				await this.removeItem(row.key);
+				await this.removeItem(row.datakey);
 			}
 
 		});
