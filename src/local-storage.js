@@ -3,6 +3,14 @@
  * http://simonlast.org
  */
 
+/**
+ * MYSQL TABLE:
+ * CREATE TABLE data_bucket_index (
+ *  key VARCHAR(128) PRIMARY KEY,
+ * 	ttl BIGINT
+ * );
+ */
+
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
