@@ -8,6 +8,7 @@ const path = require('path');
 const crypto = require('crypto');
 const pkg = require('../package.json');
 const { nextTick } = require('process');
+const mysql = require("mysql2/promise");
 
 const defaults = {
 	ttl: false,
@@ -21,6 +22,9 @@ const defaults = {
 	writeQueue: true,
 	writeQueueIntervalMs: 1000,
 	writeQueueWriteOnlyLast: true,
+	database: "nodePersist",
+	databaseUser: "root",
+	databaseHost: "localhost"
 };
 
 const defaultTTL = 24 * 60 * 60 * 1000; /* if ttl is truthy but it's not a number, use 24h as default */
@@ -88,6 +92,20 @@ LocalStorage.prototype = {
 		}
 		this.q = {}
 		this.startWriteQueueInterval();
+		this.dataBucketIndex = mysql.createPool({
+            host: options.databaseHost || defaults.databaseHost,
+            user: options.databaseUser || defaults.databaseUser,
+            password: options.mySqlPassword,
+            database: options.database || defaults.database,
+            waitForConnections: true,
+            connectionLimit: 10,
+            maxIdle: 10, // max idle connections, the default value is the same as `connectionLimit`
+            idleTimeout: 60000, // idle connections timeout, in milliseconds, the default value 60000
+            queueLimit: 0,
+            enableKeepAlive: true,
+            keepAliveInitialDelay: 0,
+            namedPlaceholders: true
+        });
 		return this.options;
 	},
 
@@ -180,7 +198,8 @@ LocalStorage.prototype = {
 		let ttl = this.calcTTL(options.ttl);
 		this.log(`set ('${key}': '${this.stringify(value)}')`);
 		let datum = { key, value, ttl };
-		return this.queueWriteFile(this.getDatumPath(key), datum);
+		this.queueWriteFile(this.getDatumPath(key), datum);
+		this.dataBucketIndex.query("INSERT INTO data_bucket_index (key, ttl) VALUES (:key, :ttl) ON DUPLICATE KEY UPDATE ttl = VALUES(ttl)", { key: key, ttl: ttl });
 	},
 
 	update: function (key, value, options = {}) {
@@ -245,14 +264,20 @@ LocalStorage.prototype = {
 	},
 
 	removeItem: function (key) {
-		return this.deleteFile(this.getDatumPath(key));
+		this.deleteFile(this.getDatumPath(key));
+		this.dataBucketIndex.query("DELETE FROM data_bucket_index WHERE key = :key", { key: key });
 	},
 
 	removeExpiredItems: async function () {
-		let keys = await this.keys(isExpired);
-		for (let key of keys) {
-			await this.removeItem(key);
-		}
+
+		this.dataBucketIndex.query("SELECT key FROM data_bucket_index WHERE ttl < :ttl", { ttl: (new Date()).getTime() }).then(async (rows) => {
+
+			for (let row of rows[0]) {
+				await this.removeItem(row.key);
+			}
+
+		});
+
 	},
 
 	clear: async function () {
